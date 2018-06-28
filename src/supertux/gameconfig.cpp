@@ -27,7 +27,7 @@
 #include "util/log.hpp"
 #include "supertux/globals.hpp"
 
-Config::Config() :
+Config::Config(int numberofplayers) :
   profile(1),
   fullscreen_size(0, 0),
   fullscreen_refresh_rate(0),
@@ -49,14 +49,22 @@ Config::Config() :
   tux_spawn_pos(),
   edit_level(),
   locale(),
-  keyboard_config(),
-  joystick_config(),
+  keyboard_configs(),
+  joystick_configs(),
   addons(),
   developer_mode(false),
   christmas_mode(false),
   transitions_enabled(true),
   repository_url()
 {
+  assert(numberofplayers > 0);
+
+  for(int i = 0; numberofplayers > i; ++i){
+    keyboard_configs.push_back(std::shared_ptr<KeyboardConfig>(
+                                              new KeyboardConfig(i)));
+    joystick_configs.push_back(std::shared_ptr<JoystickConfig>(
+                                              new JoystickConfig(i)));
+  }
 }
 
 void
@@ -124,15 +132,31 @@ Config::load()
   if (config_lisp.get("control", config_control_lisp))
   {
     ReaderMapping keymap_lisp;
-    if (config_control_lisp.get("keymap", keymap_lisp))
-    {
-      keyboard_config.read(keymap_lisp);
+    
+    assert(keyboard_configs.size() == joystick_configs.size());
+    
+    for(size_t i = 0; keyboard_configs.size() > i; ++i) {
+      if (config_control_lisp.get("keymap", keymap_lisp))
+      {
+        keyboard_configs[i].get()->read(keymap_lisp);
+      } 
+      else
+      {
+        break;
+      }
     }
 
     ReaderMapping joystick_lisp;
-    if (config_control_lisp.get("joystick", joystick_lisp))
-    {
-      joystick_config.read(joystick_lisp);
+    
+    for(size_t i = 0; joystick_configs.size() > i; ++i) {
+      if (config_control_lisp.get("joystick", joystick_lisp))
+      {
+        joystick_configs[i].get()->read(joystick_lisp);
+      }
+      else
+      {
+        break;
+      }
     }
   }
 
@@ -205,13 +229,19 @@ Config::save()
 
   writer.start_list("control");
   {
-    writer.start_list("keymap");
-    keyboard_config.write(writer);
-    writer.end_list("keymap");
+    assert(keyboard_configs.size() == joystick_configs.size());
+  
+    for(size_t i = 0; keyboard_configs.size() > i; ++i) {
+      writer.start_list("keymap");
+      keyboard_configs[i].get()->write(writer);
+      writer.end_list("keymap");
+    }
 
-    writer.start_list("joystick");
-    joystick_config.write(writer);
-    writer.end_list("joystick");
+    for(size_t i = 0; joystick_configs.size() > i; ++i) {
+      writer.start_list("joystick");
+      joystick_configs[i].get()->write(writer);
+      writer.end_list("joystick");
+    }
   }
   writer.end_list("control");
 
